@@ -93,8 +93,11 @@ public class NotesProvider extends ContentProvider {
         String id = null;
         switch (mMatcher.match(uri)) {
             case URI_NOTE:
+                String orderBy = TextUtils.isEmpty(sortOrder) ? NoteColumns.MODIFIED_DATE + " DESC"
+                        : sortOrder;
+                String sort = NoteColumns.IS_PINNED + " DESC, " + orderBy;
                 c = db.query(TABLE.NOTE, projection, selection, selectionArgs, null, null,
-                        sortOrder);
+                        sort);
                 break;
             case URI_NOTE_ITEM:
                 id = uri.getPathSegments().get(1);

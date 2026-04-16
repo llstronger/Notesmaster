@@ -30,7 +30,7 @@ import net.micode.notes.data.Notes.NoteColumns;
 public class NotesDatabaseHelper extends SQLiteOpenHelper {
     private static final String DB_NAME = "note.db";
 
-    private static final int DB_VERSION = 4;
+    private static final int DB_VERSION = 5;
 
     public interface TABLE {
         public static final String NOTE = "note";
@@ -60,6 +60,7 @@ public class NotesDatabaseHelper extends SQLiteOpenHelper {
             NoteColumns.LOCAL_MODIFIED + " INTEGER NOT NULL DEFAULT 0," +
             NoteColumns.ORIGIN_PARENT_ID + " INTEGER NOT NULL DEFAULT 0," +
             NoteColumns.GTASK_ID + " TEXT NOT NULL DEFAULT ''," +
+            NoteColumns.IS_PINNED + " INTEGER NOT NULL DEFAULT 0," +
             NoteColumns.VERSION + " INTEGER NOT NULL DEFAULT 0" +
         ")";
 
@@ -302,45 +303,20 @@ public class NotesDatabaseHelper extends SQLiteOpenHelper {
 
     @Override
     public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
-        boolean reCreateTriggers = false;
-        boolean skipV2 = false;
-
-        if (oldVersion == 1) {
-            upgradeToV2(db);
-            skipV2 = true; // this upgrade including the upgrade from v2 to v3
-            oldVersion++;
+        if (oldVersion < 4) {
+            upgradeToVersion4(db);
         }
-
-        if (oldVersion == 2 && !skipV2) {
-            upgradeToV3(db);
-            reCreateTriggers = true;
-            oldVersion++;
-        }
-
-        if (oldVersion == 3) {
-            upgradeToV4(db);
-            oldVersion++;
-        }
-
-        if (reCreateTriggers) {
-            reCreateNoteTableTriggers(db);
-            reCreateDataTableTriggers(db);
-        }
-
-        if (oldVersion != newVersion) {
-            throw new IllegalStateException("Upgrade notes database to version " + newVersion
-                    + "fails");
+        if (oldVersion < 5) {
+            try {
+                db.execSQL("ALTER TABLE " + TABLE.NOTE + " ADD COLUMN "
+                        + NoteColumns.IS_PINNED + " INTEGER NOT NULL DEFAULT 0");
+            } catch (Exception e) {
+                Log.e(TAG, e.getMessage());
+            }
         }
     }
 
-    private void upgradeToV2(SQLiteDatabase db) {
-        db.execSQL("DROP TABLE IF EXISTS " + TABLE.NOTE);
-        db.execSQL("DROP TABLE IF EXISTS " + TABLE.DATA);
-        createNoteTable(db);
-        createDataTable(db);
-    }
-
-    private void upgradeToV3(SQLiteDatabase db) {
+    private void upgradeToVersion4(SQLiteDatabase db) {
         // drop unused triggers
         db.execSQL("DROP TRIGGER IF EXISTS update_note_modified_date_on_insert");
         db.execSQL("DROP TRIGGER IF EXISTS update_note_modified_date_on_delete");
@@ -353,10 +329,5 @@ public class NotesDatabaseHelper extends SQLiteOpenHelper {
         values.put(NoteColumns.ID, Notes.ID_TRASH_FOLER);
         values.put(NoteColumns.TYPE, Notes.TYPE_SYSTEM);
         db.insert(TABLE.NOTE, null, values);
-    }
-
-    private void upgradeToV4(SQLiteDatabase db) {
-        db.execSQL("ALTER TABLE " + TABLE.NOTE + " ADD COLUMN " + NoteColumns.VERSION
-                + " INTEGER NOT NULL DEFAULT 0");
     }
 }

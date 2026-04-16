@@ -61,6 +61,12 @@ public class NotesListAdapter extends CursorAdapter {
             NoteItemData itemData = new NoteItemData(context, cursor);
             ((NotesListItem) view).bind(context, itemData, mChoiceMode,
                     isSelectedItem(cursor.getPosition()));
+
+            if (itemData.isPinned()) {
+                view.setBackgroundColor(context.getResources().getColor(R.color.pinned_note_background));
+            } else {
+                view.setBackgroundResource(itemData.getBgColorId());
+            }
         }
     }
 

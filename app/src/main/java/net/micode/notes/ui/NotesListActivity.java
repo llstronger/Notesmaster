@@ -89,6 +89,8 @@ public class NotesListActivity extends Activity implements OnClickListener, OnIt
 
     private static final int MENU_FOLDER_CHANGE_NAME = 2;
 
+    private static final int MENU_NOTE_PIN = 3;
+
     private static final String PREFERENCE_ADD_INTRODUCTION = "net.micode.notes.introduction";
 
     private enum ListEditState {
@@ -689,11 +691,16 @@ public class NotesListActivity extends Activity implements OnClickListener, OnIt
 
     private final OnCreateContextMenuListener mFolderOnCreateContextMenuListener = new OnCreateContextMenuListener() {
         public void onCreateContextMenu(ContextMenu menu, View v, ContextMenuInfo menuInfo) {
-            if (mFocusNoteDataItem != null) {
-                menu.setHeaderTitle(mFocusNoteDataItem.getSnippet());
-                menu.add(0, MENU_FOLDER_VIEW, 0, R.string.menu_folder_view);
-                menu.add(0, MENU_FOLDER_DELETE, 0, R.string.menu_folder_delete);
-                menu.add(0, MENU_FOLDER_CHANGE_NAME, 0, R.string.menu_folder_change_name);
+            if (mState == ListEditState.NOTE_LIST) {
+                getMenuInflater().inflate(R.menu.note_list, menu);
+                AdapterView.AdapterContextMenuInfo info = (AdapterView.AdapterContextMenuInfo) menuInfo;
+                mFocusNoteDataItem = new NoteItemData(this, (Cursor) mNotesListAdapter.getItem(info.position));
+                MenuItem pinMenuItem = menu.findItem(R.id.menu_pin);
+                if (mFocusNoteDataItem.isPinned()) {
+                    pinMenuItem.setTitle(R.string.menu_unpin);
+                } else {
+                    pinMenuItem.setTitle(R.string.menu_pin);
+                }
             }
         }
     };
@@ -708,32 +715,34 @@ public class NotesListActivity extends Activity implements OnClickListener, OnIt
 
     @Override
     public boolean onContextItemSelected(MenuItem item) {
-        if (mFocusNoteDataItem == null) {
-            Log.e(TAG, "The long click data item is null");
-            return false;
-        }
+        AdapterView.AdapterContextMenuInfo info = (AdapterView.AdapterContextMenuInfo) item
+                .getMenuInfo();
+        mFocusNoteDataItem = new NoteItemData(this, (Cursor) mNotesListAdapter.getItem(info.position));
 
         int id = item.getItemId();
-        if (id == MENU_FOLDER_VIEW) {
-            openFolder(mFocusNoteDataItem);
-        } else if (id == MENU_FOLDER_DELETE) {
-            AlertDialog.Builder builder = new AlertDialog.Builder(this);
-            builder.setTitle(getString(R.string.alert_title_delete));
-            builder.setIcon(android.R.drawable.ic_dialog_alert);
-            builder.setMessage(getString(R.string.alert_message_delete_folder));
-            builder.setPositiveButton(android.R.string.ok,
-                    new DialogInterface.OnClickListener() {
-                        public void onClick(DialogInterface dialog, int which) {
-                            deleteFolder(mFocusNoteDataItem.getId());
-                        }
-                    });
-            builder.setNegativeButton(android.R.string.cancel, null);
-            builder.show();
-        } else if (id == MENU_FOLDER_CHANGE_NAME) {
-            showCreateOrModifyFolderDialog(false);
+        if (id == R.id.menu_delete) {
+            if (mFocusNoteDataItem.getId() == Notes.ID_CALL_RECORD_FOLDER) {
+                showDialog(DIALOG_DELETE);
+            } else {
+                AlertDialog.Builder builder = new AlertDialog.Builder(this);
+                builder.setTitle(getString(R.string.alert_title_delete));
+                builder.setIcon(android.R.drawable.ic_dialog_alert);
+                builder.setMessage(getString(R.string.alert_message_delete_note));
+                builder.setPositiveButton(android.R.string.ok,
+                        new DialogInterface.OnClickListener() {
+                            public void onClick(DialogInterface dialog, int which) {
+                                deleteNote(mFocusNoteDataItem.getId());
+                            }
+                        });
+                builder.setNegativeButton(android.R.string.cancel, null);
+                builder.show();
+            }
+            return true;
+        } else if (id == R.id.menu_pin) {
+            pinNote(mFocusNoteDataItem.getId(), !mFocusNoteDataItem.isPinned());
+            return true;
         }
-
-        return true;
+        return super.onContextItemSelected(item);
     }
 
     @Override
