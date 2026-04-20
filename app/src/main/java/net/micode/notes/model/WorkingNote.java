@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *        http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -31,15 +31,19 @@ import net.micode.notes.data.Notes.NoteColumns;
 import net.micode.notes.data.Notes.TextNote;
 import net.micode.notes.tool.ResourceParser.NoteBgResources;
 
-
+// 核心业务模型类：代表在内存中处于“工作区”状态（即正在被新建、编辑或查看）的便签对象
 public class WorkingNote {
     // Note for the working note
+    // 内部持有的底层 Note 数据对象，用于将修改同步到 SQLite 数据库
     private Note mNote;
     // Note Id
+    // 当前便签的数据库 ID，如果是刚新建还未保存的便签，此 ID 初始为 0
     private long mNoteId;
     // Note content
+    // 缓存在内存中的便签文本正文内容
     private String mContent;
     // Note mode
+    // 模式标记：区分是普通文本模式还是清单(CheckList)模式
     private int mMode;
 
     private long mAlertDate;
@@ -102,6 +106,7 @@ public class WorkingNote {
     private static final int NOTE_MODIFIED_DATE_COLUMN = 5;
 
     // New note construct
+    // 私有构造函数：用于在内存中创建一个全新的、空的便签
     private WorkingNote(Context context, long folderId) {
         mContext = context;
         mAlertDate = 0;
@@ -115,6 +120,7 @@ public class WorkingNote {
     }
 
     // Existing note construct
+    // 私有构造函数：用于从数据库中加载一个已存在的便签到内存中以供编辑
     private WorkingNote(Context context, long noteId, long folderId) {
         mContext = context;
         mNoteId = noteId;
@@ -124,6 +130,7 @@ public class WorkingNote {
         loadNote();
     }
 
+    // 核心加载逻辑：根据便签 ID，查询 Note 主表，提取便签的元数据（颜色、闹钟、绑定的挂件等）
     private void loadNote() {
         Cursor cursor = mContext.getContentResolver().query(
                 ContentUris.withAppendedId(Notes.CONTENT_NOTE_URI, mNoteId), NOTE_PROJECTION, null,
@@ -146,6 +153,7 @@ public class WorkingNote {
         loadNoteData();
     }
 
+    // 核心加载逻辑：根据便签 ID，查询 Data 数据表，提取该便签实际的文字内容或通话记录信息
     private void loadNoteData() {
         Cursor cursor = mContext.getContentResolver().query(Notes.CONTENT_DATA_URI, DATA_PROJECTION,
                 DataColumns.NOTE_ID + "=?", new String[] {
@@ -187,20 +195,24 @@ public class WorkingNote {
         return new WorkingNote(context, id, 0);
     }
 
+    // 核心保存逻辑：将内存中的便签修改状态保存（持久化）到底层数据库中
     public synchronized boolean saveNote() {
-        if (isWorthSaving()) {
+        if (isWorthSaving()) { // 先判断是否有实质性的修改内容
             if (!existInDatabase()) {
+                // 如果是新建的便签（尚未入库），则向数据库申请生成一个新的便签记录和 ID
                 if ((mNoteId = Note.getNewNoteId(mContext, mFolderId)) == 0) {
                     Log.e(TAG, "Create new note fail with id:" + mNoteId);
                     return false;
                 }
             }
 
+            // 调用底层的 Note 对象执行实际的 ContentResolver update 同步操作
             mNote.syncNote(mContext, mNoteId);
 
             /**
              * Update widget content if there exist any widget of this note
              */
+            // 如果此便签被贴在了手机桌面上作为小插件，通知挂件刷新UI内容
             if (mWidgetId != AppWidgetManager.INVALID_APPWIDGET_ID
                     && mWidgetType != Notes.TYPE_WIDGET_INVALIDE
                     && mNoteSettingStatusListener != null) {
@@ -216,6 +228,8 @@ public class WorkingNote {
         return mNoteId > 0;
     }
 
+    // 判断逻辑：当前便签的状态是否值得进行一次数据库写操作。
+    // 如果便签已被删除、或者新建但内容为空、或者没有做任何修改，则返回 false，避免浪费性能写库
     private boolean isWorthSaving() {
         if (mIsDeleted || (!existInDatabase() && TextUtils.isEmpty(mContent))
                 || (existInDatabase() && !mNote.isLocalModified())) {
@@ -281,10 +295,11 @@ public class WorkingNote {
         }
     }
 
+    // 设置便签当前的文本正文（通常在 UI 层用户使用 EditText 输入文字发生改变时被调用）
     public void setWorkingText(String text) {
-        if (!TextUtils.equals(mContent, text)) {
+        if (!TextUtils.equals(mContent, text)) { // 只有文本真正发生变化时才更新，优化性能
             mContent = text;
-            mNote.setTextData(DataColumns.CONTENT, mContent);
+            mNote.setTextData(DataColumns.CONTENT, mContent); // 委托给底层 Note 记录 Diff 差异
         }
     }
 
@@ -342,6 +357,7 @@ public class WorkingNote {
         return mWidgetType;
     }
 
+    // 内部回调接口定义：当便签的状态（如颜色、闹钟、清单模式）发生变化时，通知外部 UI 或 Widget 刷新
     public interface NoteSettingChangedListener {
         /**
          * Called when the background color of current note has just changed
