@@ -25,4 +25,14 @@
         android:text="保存修改"
         android:layout_marginTop="20dp"/>
 
+    <TextView
+        android:id="@+id/tv_word_count"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="字数：0"
+        android:textSize="12sp"
+        android:textColor="#999999"
+        android:paddingHorizontal="16dp"
+        android:paddingVertical="6dp"/>
+
 </LinearLayout>

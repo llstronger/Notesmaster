@@ -129,6 +129,15 @@ public class NotesListActivity extends Activity implements OnClickListener, OnIt
         NOTE_LIST, SUB_FOLDER, CALL_RECORD_FOLDER
     }
 
+    private static final String[] FOLDER_PROJECTION = new String[] {
+            NoteColumns.ID,
+            NoteColumns.TYPE,
+            NoteColumns.SNIPPET,
+            NoteColumns.MODIFIED_DATE,
+            NoteColumns.ALERTED_DATE,
+            NoteColumns.PARENT_ID
+    };
+
     /** 当前列表页面所处的状态 */
     private ListEditState mState;
 
@@ -680,25 +689,42 @@ public class NotesListActivity extends Activity implements OnClickListener, OnIt
     private void showFolderListMenu(Cursor cursor) {
         AlertDialog.Builder builder = new AlertDialog.Builder(NotesListActivity.this);
         builder.setTitle(R.string.menu_title_select_folder);
-        final NoteEditActivity adapter = new NoteEditActivity(this, cursor);
+
+        // ✅ 只传 this，不传 cursor
+        final NotesListAdapter adapter = new NotesListAdapter(this);
+
+        // ✅ 通过方法设置 Cursor（根据实际方法名选择）
+        adapter.changeCursor(cursor);   // 或 adapter.swapCursor(cursor)
+        // 或者 adapter.setCursor(cursor);
+
         builder.setAdapter(adapter, new DialogInterface.OnClickListener() {
             public void onClick(DialogInterface dialog, int which) {
-                // 批量将选中便签移动到用户选择的文件夹
+                // 注意：这里应该用 dialog 的 Cursor，不是成员变量的
+                Cursor dialogCursor = adapter.getCursor();
+                dialogCursor.moveToPosition(which);
+
+                int columnIndex = dialogCursor.getColumnIndex(NoteColumns.SNIPPET);
+                String folderName = columnIndex != -1
+                        ? dialogCursor.getString(columnIndex)
+                        : "默认文件夹";
+
                 DataUtils.batchMoveToFolder(mContentResolver,
                         mNotesListAdapter.getSelectedItemIds(),
                         adapter.getItemId(which));
+
                 Toast.makeText(
                         NotesListActivity.this,
                         getString(R.string.format_move_notes_to_folder,
                                 mNotesListAdapter.getSelectedCount(),
-                                adapter.getFolderName(NotesListActivity.this, which)),
+                                folderName),
                         Toast.LENGTH_SHORT).show();
-                // 移动完成后退出多选模式
+
                 mModeCallBack.finishActionMode();
             }
         });
         builder.show();
     }
+
 
     /**
      * 跳转到便签编辑页面，新建一条便签。
@@ -1307,7 +1333,6 @@ public class NotesListActivity extends Activity implements OnClickListener, OnIt
                 + NoteColumns.PARENT_ID + "<>? AND "
                 + NoteColumns.ID + "<>?";
 
-        // 若在子文件夹中，追加根文件夹作为可选目标
         selection = (mState == ListEditState.NOTE_LIST) ? selection
                 : "(" + selection + ") OR ("
                 + NoteColumns.ID + "=" + Notes.ID_ROOT_FOLDER + ")";
@@ -1315,12 +1340,12 @@ public class NotesListActivity extends Activity implements OnClickListener, OnIt
         mBackgroundQueryHandler.startQuery(FOLDER_LIST_QUERY_TOKEN,
                 null,
                 Notes.CONTENT_NOTE_URI,
-                NoteEditActivity.PROJECTION,
+                FOLDER_PROJECTION,  // ← 改成自定义的常量名
                 selection,
                 new String[]{
-                        String.valueOf(Notes.TYPE_FOLDER),    // 只查询文件夹类型
-                        String.valueOf(Notes.ID_TRASH_FOLER), // 排除回收站
-                        String.valueOf(mCurrentFolderId)       // 排除当前所在文件夹
+                        String.valueOf(Notes.TYPE_FOLDER),
+                        String.valueOf(Notes.ID_TRASH_FOLER),
+                        String.valueOf(mCurrentFolderId)
                 },
                 NoteColumns.MODIFIED_DATE + " DESC");
     }

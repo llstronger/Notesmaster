@@ -3,9 +3,13 @@ package net.micode.notes;
 import android.content.ContentValues;
 import android.database.sqlite.SQLiteDatabase;
 import android.os.Bundle;
+import android.text.Editable;
+import android.text.TextWatcher;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.TextView;
+
 import androidx.appcompat.app.AppCompatActivity;
 
 /**
@@ -26,6 +30,9 @@ public class EditNoteActivity extends AppCompatActivity {
 
     /** 便签内容输入框 */
     EditText et_content;
+
+    // 字数统计控件
+    TextView tvWordCount;
 
     /** 保存按钮 */
     Button btn_save;
@@ -59,6 +66,7 @@ public class EditNoteActivity extends AppCompatActivity {
         // 通过 ID 绑定布局中的各个控件
         et_title   = findViewById(R.id.et_title);
         et_content = findViewById(R.id.et_content);
+        tvWordCount = findViewById(R.id.tv_word_count);
         btn_save   = findViewById(R.id.btn_save);
 
         // 初始化数据库帮助类，用于后续获取数据库连接
@@ -75,6 +83,25 @@ public class EditNoteActivity extends AppCompatActivity {
         // 将原有标题和内容填入输入框，供用户查看和修改
         et_title.setText(title);
         et_content.setText(content);
+
+        // ==============================================
+        // 【字数统计功能 - 已自动集成】
+        // ==============================================
+        tvWordCount.setText("字数：" + et_content.getText().length());
+        et_content.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {}
+
+            @Override
+            public void afterTextChanged(Editable s) {
+                // 实时统计字数（汉字、字母、数字、标点都算）
+                int total = s.length();
+                tvWordCount.setText("字数：" + total);
+            }
+        });
 
         // 为保存按钮注册点击事件监听器
         btn_save.setOnClickListener(v -> {
